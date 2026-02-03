@@ -1,25 +1,14 @@
-# =============================================================================
-# Data Science Coursework - EDA, Visualization, Linear Modeling & Recommendation
-# Counties: Cheshire and Cumberland (UK)
-# Author: Samir Nath Arjyal
-# =============================================================================
-
-# Load required libraries
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(lubridate)
 library(scales)
 library(gridExtra)
+library(fmsb)
 
 # Set working directory path
 base_path <- "Coursework_DS_Samir_Nath_Arjyal"
 
-# =============================================================================
-# SECTION 1: DATA LOADING AND PREPROCESSING
-# =============================================================================
-
-# --- 1.1 Load House Price Data ---
 house_prices_2022 <- read_csv(file.path(base_path, "Cleaned data /cleaned_house_prices_2022.csv"))
 house_prices_2023 <- read_csv(file.path(base_path, "Cleaned data /cleaned_house_prices_2023.csv"))
 house_prices_2024 <- read_csv(file.path(base_path, "Cleaned data /cleaned_house_prices_2024.csv"))
@@ -43,7 +32,6 @@ all_house_prices <- all_house_prices %>%
   ) %>%
   filter(region != "Other")
 
-# --- 1.2 Load Broadband Performance Data ---
 broadband_performance <- read_csv(file.path(base_path, "Cleaned data /broadbandSpeed_performance.csv"))
 
 # Add postcode area for classification (first letters of postcode)
@@ -57,7 +45,7 @@ broadband_performance <- broadband_performance %>%
     )
   )
 
-# --- 1.3 Load Population Data ---
+
 population_data <- read_csv(
   file.path(base_path, "Obtained data /Population2011_1656567141570.csv"),
   col_types = cols(
@@ -120,11 +108,6 @@ crime_data <- crime_data %>%
 
 cat("Data loaded successfully!\n")
 
-# =============================================================================
-# SECTION 2: HOUSE PRICES EDA AND VISUALIZATION
-# =============================================================================
-
-# --- 2.1 Calculate Average House Prices by Town ---
 avg_house_prices_by_town <- all_house_prices %>%
   group_by(town, region, year) %>%
   summarise(
@@ -135,72 +118,140 @@ avg_house_prices_by_town <- all_house_prices %>%
   ) %>%
   filter(num_sales >= 5)
 
-# --- 2.2 BOXPLOT: Average House Prices for Year 2023 by Town ---
-house_prices_2023_summary <- avg_house_prices_by_town %>%
+# --- Figure 1: BOXPLOT - Average House Price per County in 2023 ---
+boxplot_data_2023 <- all_house_prices %>%
   filter(year == 2023)
 
-top_towns_2023 <- house_prices_2023_summary %>%
-  group_by(region) %>%
-  top_n(8, num_sales) %>%
-  ungroup()
-
-boxplot_data_2023 <- all_house_prices %>%
-  filter(year == 2023, town %in% top_towns_2023$town)
-
-p1 <- ggplot(boxplot_data_2023, aes(x = reorder(town, price, FUN = median), y = price, fill = region)) +
+p1 <- ggplot(boxplot_data_2023, aes(x = region, y = price, fill = region)) +
   geom_boxplot(outlier.shape = 21, outlier.size = 1) +
-  coord_flip() +
   scale_y_continuous(labels = label_comma(prefix = "£"), limits = c(0, 1000000)) +
   labs(
-    title = "House Prices Distribution by Town (2023)",
+    title = "Figure 1: Boxplot of Average House Price per County in 2023",
     subtitle = "Comparing Cheshire and Cumberland Counties",
-    x = "Town",
+    x = "County",
     y = "House Price (£)",
     fill = "Region"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    axis.text.y = element_text(size = 10)
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text = element_text(size = 10),
+    legend.position = "none"
   ) +
   scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
 
-ggsave(file.path(base_path, "Graphs /boxplot_house_prices_2023.png"), 
-       plot = p1, width = 12, height = 8, dpi = 120)
-cat("Saved: boxplot_house_prices_2023.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_1_boxplot_house_price_by_county_2023.png"), 
+       plot = p1, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_1_boxplot_house_price_by_county_2023.png\n")
 
-# --- 2.3 BAR CHART: Average House Price for 2022 (Both Counties) ---
-avg_prices_2022 <- avg_house_prices_by_town %>%
+# --- Figure 2: BOXPLOT - House Price by Towns in Cheshire ---
+cheshire_towns_2023 <- all_house_prices %>%
+  filter(year == 2023, region == "Cheshire") %>%
+  group_by(town) %>%
+  filter(n() >= 10) %>%
+  ungroup()
+
+top_cheshire_towns <- cheshire_towns_2023 %>%
+  group_by(town) %>%
+  summarise(n = n()) %>%
+  top_n(10, n) %>%
+  pull(town)
+
+cheshire_boxplot_data <- cheshire_towns_2023 %>%
+  filter(town %in% top_cheshire_towns)
+
+p2 <- ggplot(cheshire_boxplot_data, aes(x = reorder(town, price, FUN = median), y = price)) +
+  geom_boxplot(fill = "#3498db", outlier.shape = 21, outlier.size = 1) +
+  coord_flip() +
+  scale_y_continuous(labels = label_comma(prefix = "£"), limits = c(0, 1000000)) +
+  labs(
+    title = "Figure 2: Boxplot of House Price by Towns in Cheshire",
+    subtitle = "Top 10 Towns by Number of Sales (2023)",
+    x = "Town",
+    y = "House Price (£)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 9)
+  )
+
+ggsave(file.path(base_path, "Graphs/Figure_2_boxplot_house_price_cheshire_towns.png"), 
+       plot = p2, width = 12, height = 8, dpi = 120)
+cat("Saved: Figure_2_boxplot_house_price_cheshire_towns.png\n")
+
+# --- Figure 3: BOXPLOT - House Prices in Cumberland ---
+cumberland_towns_2023 <- all_house_prices %>%
+  filter(year == 2023, region == "Cumberland") %>%
+  group_by(town) %>%
+  filter(n() >= 5) %>%
+  ungroup()
+
+top_cumberland_towns <- cumberland_towns_2023 %>%
+  group_by(town) %>%
+  summarise(n = n()) %>%
+  top_n(10, n) %>%
+  pull(town)
+
+cumberland_boxplot_data <- cumberland_towns_2023 %>%
+  filter(town %in% top_cumberland_towns)
+
+p3 <- ggplot(cumberland_boxplot_data, aes(x = reorder(town, price, FUN = median), y = price)) +
+  geom_boxplot(fill = "#e74c3c", outlier.shape = 21, outlier.size = 1) +
+  coord_flip() +
+  scale_y_continuous(labels = label_comma(prefix = "£"), limits = c(0, 800000)) +
+  labs(
+    title = "Figure 3: Boxplot of House Prices in Cumberland",
+    subtitle = "Top 10 Towns by Number of Sales (2023)",
+    x = "Town",
+    y = "House Price (£)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.y = element_text(size = 9)
+  )
+
+ggsave(file.path(base_path, "Graphs/Figure_3_boxplot_house_price_cumberland_towns.png"), 
+       plot = p3, width = 12, height = 8, dpi = 120)
+cat("Saved: Figure_3_boxplot_house_price_cumberland_towns.png\n")
+
+# --- Figure 4: BAR CHART - Average House Price by Counties in 2022 ---
+avg_prices_by_county_2022 <- all_house_prices %>%
   filter(year == 2022) %>%
   group_by(region) %>%
-  top_n(10, num_sales) %>%
-  ungroup() %>%
-  arrange(region, desc(avg_price))
+  summarise(
+    avg_price = mean(price, na.rm = TRUE),
+    median_price = median(price, na.rm = TRUE),
+    num_sales = n(),
+    .groups = "drop"
+  )
 
-p2 <- ggplot(avg_prices_2022, aes(x = reorder(town, avg_price), y = avg_price, fill = region)) +
-  geom_bar(stat = "identity", width = 0.7) +
-  coord_flip() +
-  facet_wrap(~region, scales = "free_y") +
-  scale_y_continuous(labels = label_comma(prefix = "£")) +
+p4 <- ggplot(avg_prices_by_county_2022, aes(x = region, y = avg_price, fill = region)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(aes(label = paste0("£", format(round(avg_price), big.mark = ","))), 
+            vjust = -0.5, size = 4) +
+  scale_y_continuous(labels = label_comma(prefix = "£"), 
+                     limits = c(0, max(avg_prices_by_county_2022$avg_price) * 1.15)) +
   labs(
-    title = "Average House Prices by Town (2022)",
-    subtitle = "Top Towns in Cheshire and Cumberland",
-    x = "Town",
+    title = "Figure 4: Barchart of Average House Price by Counties in 2022",
+    subtitle = "Comparing Average House Prices in Cheshire and Cumberland",
+    x = "County",
     y = "Average House Price (£)",
     fill = "Region"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    strip.text = element_text(size = 12, face = "bold")
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "none"
   ) +
   scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
 
-ggsave(file.path(base_path, "Graphs /barchart_avg_house_prices_2022.png"), 
-       plot = p2, width = 14, height = 8, dpi = 120)
-cat("Saved: barchart_avg_house_prices_2022.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_4_barchart_avg_house_price_2022.png"), 
+       plot = p4, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_4_barchart_avg_house_price_2022.png\n")
 
-# --- 2.4 LINE GRAPH: Average House Prices 2022-2024 (Both Counties) ---
+# --- Figure 5: LINE GRAPH - Yearly House Price by County (2022-2024) ---
 yearly_avg_prices <- all_house_prices %>%
   group_by(region, year) %>%
   summarise(
@@ -209,7 +260,7 @@ yearly_avg_prices <- all_house_prices %>%
     .groups = "drop"
   )
 
-p3 <- ggplot(yearly_avg_prices, aes(x = year, y = avg_price, color = region, group = region)) +
+p5 <- ggplot(yearly_avg_prices, aes(x = year, y = avg_price, color = region, group = region)) +
   geom_line(linewidth = 1.5) +
   geom_point(size = 4) +
   geom_text(aes(label = paste0("£", round(avg_price/1000, 0), "k")), 
@@ -218,52 +269,53 @@ p3 <- ggplot(yearly_avg_prices, aes(x = year, y = avg_price, color = region, gro
                      limits = c(0, max(yearly_avg_prices$avg_price) * 1.2)) +
   scale_x_continuous(breaks = c(2022, 2023, 2024)) +
   labs(
-    title = "Average House Prices Trend (2022-2024)",
+    title = "Figure 5: Line Graph Showing Yearly House Price by County (2022-2024)",
     subtitle = "Comparing Cheshire and Cumberland Counties",
     x = "Year",
     y = "Average House Price (£)",
-    color = "Region"
+    color = "County"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold"),
     legend.position = "bottom"
   ) +
   scale_color_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
 
-ggsave(file.path(base_path, "Graphs /linegraph_house_prices_2022_2024.png"), 
-       plot = p3, width = 10, height = 6, dpi = 120)
-cat("Saved: linegraph_house_prices_2022_2024.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_5_linegraph_house_prices_2022_2024.png"), 
+       plot = p5, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_5_linegraph_house_prices_2022_2024.png\n")
 
 # =============================================================================
-# SECTION 3: BROADBAND SPEED EDA AND VISUALIZATION
+# SECTION 3: BROADBAND SPEED EDA AND VISUALIZATION (Figures 6-8)
 # =============================================================================
 
-# --- 3.1 BOXPLOT: Average Download Speeds by Region ---
+# Filter broadband data for relevant regions
 broadband_by_region <- broadband_performance %>%
   filter(region %in% c("Cheshire", "Cumberland"))
 
-p4 <- ggplot(broadband_by_region, aes(x = region, y = mean_avg_download, fill = region)) +
+# --- Figure 6: BOXPLOT - Average Download Speed By County ---
+p6 <- ggplot(broadband_by_region, aes(x = region, y = mean_avg_download, fill = region)) +
   geom_boxplot(outlier.shape = 21, outlier.alpha = 0.5) +
   labs(
-    title = "Distribution of Average Download Speeds",
+    title = "Figure 6: Boxplot of Average Download Speed By County",
     subtitle = "Comparing Cheshire and Cumberland Counties",
-    x = "Region",
+    x = "County",
     y = "Average Download Speed (Mbit/s)",
-    fill = "Region"
+    fill = "County"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold"),
     legend.position = "none"
   ) +
   scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
 
-ggsave(file.path(base_path, "Graphs/boxplot_broadband_speeds.png"), 
-       plot = p4, width = 10, height = 6, dpi = 120)
-cat("Saved: boxplot_broadband_speeds.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_6_boxplot_download_speed_by_county.png"), 
+       plot = p6, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_6_boxplot_download_speed_by_county.png\n")
 
-# --- 3.2 Create postcode district summary ---
+# --- Create postcode district summary ---
 broadband_by_district <- broadband_performance %>%
   mutate(postcode_district = str_extract(postcode, "^[A-Z]+[0-9]+")) %>%
   group_by(postcode_district, region) %>%
@@ -276,145 +328,166 @@ broadband_by_district <- broadband_performance %>%
   ) %>%
   filter(region %in% c("Cheshire", "Cumberland"))
 
-# --- 3.3 STACKED BAR CHART: Cheshire Broadband Speeds ---
+# --- Figure 7: STACKED BAR CHART - Average and Maximum Download Speed in Cheshire ---
 cheshire_broadband <- broadband_by_district %>%
   filter(region == "Cheshire") %>%
   arrange(desc(avg_download)) %>%
   head(15) %>%
   pivot_longer(cols = c(avg_download, max_download), names_to = "speed_type", values_to = "speed")
 
-p5 <- ggplot(cheshire_broadband, aes(x = reorder(postcode_district, speed), y = speed, fill = speed_type)) +
+p7 <- ggplot(cheshire_broadband, aes(x = reorder(postcode_district, speed), y = speed, fill = speed_type)) +
   geom_bar(stat = "identity", position = "dodge", width = 0.7) +
   coord_flip() +
   labs(
-    title = "Broadband Speeds in Cheshire by Postcode District",
-    subtitle = "Average and Maximum Download Speeds",
+    title = "Figure 7: Stacked Barchart of Average and Maximum Download Speed in Cheshire",
+    subtitle = "By Postcode District",
     x = "Postcode District",
     y = "Speed (Mbit/s)",
     fill = "Speed Type"
   ) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(plot.title = element_text(size = 14, face = "bold")) +
   scale_fill_manual(values = c("avg_download" = "#3498db", "max_download" = "#1a5276"),
                     labels = c("Average Download", "Max Download"))
 
-ggsave(file.path(base_path, "Graphs/stacked_barchart_cheshire_broadband.png"), 
-       plot = p5, width = 12, height = 7, dpi = 120)
-cat("Saved: stacked_barchart_cheshire_broadband.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_7_stacked_barchart_cheshire_broadband.png"), 
+       plot = p7, width = 12, height = 7, dpi = 120)
+cat("Saved: Figure_7_stacked_barchart_cheshire_broadband.png\n")
 
-# --- 3.4 STACKED BAR CHART: Cumberland Broadband Speeds ---
+# --- Figure 8: Average and Maximum Download Speeds in Cumberland ---
 cumberland_broadband <- broadband_by_district %>%
   filter(region == "Cumberland") %>%
   arrange(desc(avg_download)) %>%
   head(15) %>%
   pivot_longer(cols = c(avg_download, max_download), names_to = "speed_type", values_to = "speed")
 
-p6 <- ggplot(cumberland_broadband, aes(x = reorder(postcode_district, speed), y = speed, fill = speed_type)) +
+p8 <- ggplot(cumberland_broadband, aes(x = reorder(postcode_district, speed), y = speed, fill = speed_type)) +
   geom_bar(stat = "identity", position = "dodge", width = 0.7) +
   coord_flip() +
   labs(
-    title = "Broadband Speeds in Cumberland by Postcode District",
-    subtitle = "Average and Maximum Download Speeds",
+    title = "Figure 8: Average and Maximum Download Speeds in Cumberland",
+    subtitle = "By Postcode District",
     x = "Postcode District",
     y = "Speed (Mbit/s)",
     fill = "Speed Type"
   ) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
+  theme(plot.title = element_text(size = 14, face = "bold")) +
   scale_fill_manual(values = c("avg_download" = "#e74c3c", "max_download" = "#922b21"),
                     labels = c("Average Download", "Max Download"))
 
-ggsave(file.path(base_path, "Graphs/stacked_barchart_cumberland_broadband.png"), 
-       plot = p6, width = 12, height = 7, dpi = 120)
-cat("Saved: stacked_barchart_cumberland_broadband.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_8_stacked_barchart_cumberland_broadband.png"), 
+       plot = p8, width = 12, height = 7, dpi = 120)
+cat("Saved: Figure_8_stacked_barchart_cumberland_broadband.png\n")
 
-# =============================================================================
-# SECTION 4: CRIME RATE EDA AND VISUALIZATION
-# =============================================================================
 
-# --- 4.1 BOXPLOT: Drug Offense Rate by Region ---
+# Population by region for rate calculations
+population_by_region <- population_data %>%
+  group_by(region) %>%
+  summarise(total_population = sum(Population, na.rm = TRUE), .groups = "drop")
+
+# --- Figure 9: BOXPLOT - Drug Offense Rate by County ---
 drug_offenses <- crime_data %>%
   filter(`Crime type` == "Drugs") %>%
   group_by(region, `LSOA name`) %>%
   summarise(drug_count = n(), .groups = "drop")
 
-p7 <- ggplot(drug_offenses, aes(x = region, y = drug_count, fill = region)) +
+p9 <- ggplot(drug_offenses, aes(x = region, y = drug_count, fill = region)) +
   geom_boxplot(outlier.shape = 21, outlier.alpha = 0.5) +
   labs(
-    title = "Distribution of Drug Offenses by LSOA",
-    subtitle = "Comparing Cheshire and Cumberland Counties",
-    x = "Region",
+    title = "Figure 9: Drug Offence Rate by County",
+    subtitle = "Distribution of Drug Offenses by LSOA - Comparing Cheshire and Cumberland",
+    x = "County",
     y = "Number of Drug Offenses",
-    fill = "Region"
+    fill = "County"
   ) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold"), legend.position = "none") +
+  theme(plot.title = element_text(size = 14, face = "bold"), legend.position = "none") +
   scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
 
-ggsave(file.path(base_path, "Graphs/boxplot_drug_offenses.png"), 
-       plot = p7, width = 10, height = 6, dpi = 120)
-cat("Saved: boxplot_drug_offenses.png\n")
+ggsave(file.path(base_path, "Graphs/Figure_9_boxplot_drug_offenses_by_county.png"), 
+       plot = p9, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_9_boxplot_drug_offenses_by_county.png\n")
 
-# --- 4.2 Crime Summary for 2023 ---
-crime_2023 <- crime_data %>% filter(year == 2023)
-crime_summary_2023 <- crime_2023 %>%
+# --- Figure 10: RADAR CHART - Vehicle Crime in December 2023 ---
+# Get crime type breakdown for December 2023 for radar chart
+crime_dec_2023 <- crime_data %>%
+  filter(month_year == "2023-12") %>%
   group_by(region, `Crime type`) %>%
-  summarise(count = n(), .groups = "drop")
+  summarise(count = n(), .groups = "drop") %>%
+  left_join(population_by_region, by = "region") %>%
+  mutate(rate_per_10k = (count / total_population) * 10000)
 
-# --- 4.3 BAR CHART: Crime Type Comparison 2023 ---
-radar_data <- crime_summary_2023 %>%
-  filter(`Crime type` %in% c("Vehicle crime", "Burglary", "Drugs", 
-                             "Robbery", "Violence and sexual offences",
-                             "Criminal damage and arson", "Other theft")) %>%
-  pivot_wider(names_from = region, values_from = count, values_fill = 0)
+# Prepare radar chart data
+radar_crime_types <- c("Vehicle crime", "Burglary", "Drugs", "Robbery", 
+                       "Criminal damage and arson", "Other theft")
 
-radar_long <- radar_data %>%
-  pivot_longer(cols = c(Cheshire, Cumberland), names_to = "region", values_to = "count")
+radar_data <- crime_dec_2023 %>%
+  filter(`Crime type` %in% radar_crime_types) %>%
+  select(region, `Crime type`, rate_per_10k) %>%
+  pivot_wider(names_from = `Crime type`, values_from = rate_per_10k, values_fill = 0)
 
-p8 <- ggplot(radar_long, aes(x = reorder(`Crime type`, count), y = count, fill = region)) +
-  geom_bar(stat = "identity", position = "dodge", width = 0.7) +
-  coord_flip() +
+# Create radar chart
+if(nrow(radar_data) > 0) {
+  # Prepare data for fmsb radar chart
+  radar_matrix <- radar_data %>% select(-region) %>% as.data.frame()
+  rownames(radar_matrix) <- radar_data$region
+  
+  # Add max and min rows for radar chart
+  max_val <- max(unlist(radar_matrix), na.rm = TRUE) * 1.2
+  radar_matrix <- rbind(rep(max_val, ncol(radar_matrix)), rep(0, ncol(radar_matrix)), radar_matrix)
+  
+  # Save radar chart
+  png(file.path(base_path, "Graphs/Figure_10_radar_vehicle_crime_dec_2023.png"), 
+      width = 800, height = 600, res = 100)
+  
+  par(mar = c(2, 2, 3, 2))
+  radarchart(radar_matrix,
+             axistype = 1,
+             pcol = c("#3498db", "#e74c3c"),
+             pfcol = c(rgb(0.2, 0.4, 0.7, 0.3), rgb(0.9, 0.3, 0.2, 0.3)),
+             plwd = 2,
+             cglcol = "grey",
+             cglty = 1,
+             axislabcol = "grey",
+             vlcex = 0.8,
+             title = "Figure 10: Radar Chart of Vehicle Crime in December 2023\n(Crime Rate per 10,000 People)")
+  
+  legend("topright", legend = c("Cheshire", "Cumberland"), 
+         col = c("#3498db", "#e74c3c"), lty = 1, lwd = 2, bty = "n")
+  
+  dev.off()
+  cat("Saved: Figure_10_radar_vehicle_crime_dec_2023.png\n")
+}
+
+robbery_sep_2023 <- crime_data %>%
+  filter(`Crime type` == "Robbery", month_year == "2023-09") %>%
+  group_by(region) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  left_join(population_by_region, by = "region") %>%
+  mutate(rate_per_10k = (count / total_population) * 10000)
+
+p11 <- ggplot(robbery_sep_2023, aes(x = region, y = rate_per_10k, fill = region)) +
+  geom_bar(stat = "identity", width = 0.6) +
+  geom_text(aes(label = round(rate_per_10k, 3)), vjust = -0.5, size = 4) +
   labs(
-    title = "Crime Type Comparison (2023)",
-    subtitle = "Cheshire vs Cumberland",
-    x = "Crime Type",
-    y = "Number of Incidents",
-    fill = "Region"
+    title = "Figure 11: Robbery Rate per 10,000 People in September 2023",
+    subtitle = "Comparing Cheshire and Cumberland Counties",
+    x = "County",
+    y = "Robbery Rate per 10,000 People",
+    fill = "County"
   ) +
   theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
-
-ggsave(file.path(base_path, "Graphs/radarchart_vehicle_crime_2023.png"), 
-       plot = p8, width = 10, height = 8, dpi = 120)
-cat("Saved: radarchart_vehicle_crime_2023.png\n")
-
-# --- 4.4 PIE CHART: Robbery Rate 2023 ---
-robbery_2023 <- crime_summary_2023 %>% filter(`Crime type` == "Robbery")
-
-p9 <- ggplot(robbery_2023, aes(x = "", y = count, fill = region)) +
-  geom_bar(stat = "identity", width = 1) +
-  coord_polar("y", start = 0) +
-  labs(
-    title = "Robbery Incidents Distribution (2023)",
-    subtitle = "Cheshire vs Cumberland",
-    fill = "Region"
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "none"
   ) +
-  theme_void() +
-  theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5)) +
-  geom_text(aes(label = paste0(count, "\n(", round(count/sum(count)*100, 1), "%)")),
-            position = position_stack(vjust = 0.5), color = "white", size = 5) +
-  scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
+  scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c")) +
+  scale_y_continuous(limits = c(0, max(robbery_sep_2023$rate_per_10k) * 1.3))
 
-ggsave(file.path(base_path, "Graphs/piechart_robbery_2023.png"), 
-       plot = p9, width = 8, height = 6, dpi = 120)
-cat("Saved: piechart_robbery_2023.png\n")
-
-# --- 4.5 LINE GRAPH: Drug Offense Rate per 10k People ---
-population_by_region <- population_data %>%
-  group_by(region) %>%
-  summarise(total_population = sum(Population, na.rm = TRUE), .groups = "drop")
-
+ggsave(file.path(base_path, "Graphs/Figure_11_barchart_robbery_rate_sep_2023.png"), 
+       plot = p11, width = 10, height = 6, dpi = 120)
+cat("Saved: Figure_11_barchart_robbery_rate_sep_2023.png\n")
 drug_by_month <- crime_data %>%
   filter(`Crime type` == "Drugs") %>%
   group_by(region, month_year) %>%
@@ -426,222 +499,25 @@ drug_by_month <- crime_data %>%
   ) %>%
   arrange(date)
 
-p10 <- ggplot(drug_by_month, aes(x = date, y = drug_per_10k, color = region, group = region)) +
+p12 <- ggplot(drug_by_month, aes(x = date, y = drug_per_10k, color = region, group = region)) +
   geom_line(linewidth = 1.2) +
   geom_point(size = 2) +
   labs(
-    title = "Drug Offense Rate per 10,000 People Over Time",
-    subtitle = "Comparing Cheshire and Cumberland Counties",
+    title = "Figure 12: Drug Offence Rate per 10,000 People for Cheshire and Cumberland",
+    subtitle = "Monthly Trend Comparison",
     x = "Date",
     y = "Drug Offenses per 10,000 People",
-    color = "Region"
+    color = "County"
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 16, face = "bold"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
   ) +
   scale_color_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c")) +
   scale_x_date(date_breaks = "2 months", date_labels = "%b %Y")
 
-ggsave(file.path(base_path, "Graphs /linegraph_drug_offenses_per_10k.png"), 
-       plot = p10, width = 12, height = 6, dpi = 120)
-cat("Saved: linegraph_drug_offenses_per_10k.png\n")
-
-# =============================================================================
-# SECTION 5: LINEAR MODELING VISUALIZATIONS
-# =============================================================================
-
-# Prepare data for linear modeling
-house_by_district <- all_house_prices %>%
-  mutate(postcode_district = str_extract(postcode, "^[A-Z]+[0-9]+")) %>%
-  filter(year == 2023) %>%
-  group_by(postcode_district, region) %>%
-  summarise(avg_house_price = mean(price, na.rm = TRUE), .groups = "drop")
-
-modeling_data <- house_by_district %>%
-  left_join(broadband_by_district, by = c("postcode_district", "region")) %>%
-  filter(!is.na(avg_download))
-
-lm_price_speed <- lm(avg_house_price ~ avg_download, data = modeling_data)
-
-p11 <- ggplot(modeling_data, aes(x = avg_download, y = avg_house_price, color = region)) +
-  geom_point(size = 3, alpha = 0.7) +
-  geom_smooth(method = "lm", se = TRUE, aes(group = 1), color = "black", linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE) +
-  scale_y_continuous(labels = label_comma(prefix = "£")) +
-  labs(
-    title = "House Price vs Download Speed",
-    subtitle = paste("R² =", round(summary(lm_price_speed)$r.squared, 3)),
-    x = "Average Download Speed (Mbit/s)",
-    y = "Average House Price (£)",
-    color = "Region"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  scale_color_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c"))
-
-ggsave(file.path(base_path, "Graphs /linear_model_price_vs_speed.png"), 
-       plot = p11, width = 10, height = 7, dpi = 120)
-cat("Saved: linear_model_price_vs_speed.png\n")
-
-# --- Regional Comparison ---
-broadband_by_region_summary <- broadband_by_region %>%
-  group_by(region) %>%
-  summarise(avg_download_speed = mean(mean_avg_download, na.rm = TRUE), .groups = "drop")
-
-drug_rate_by_region <- crime_data %>%
-  filter(`Crime type` == "Drugs", year == 2023) %>%
-  group_by(region) %>%
-  summarise(total_drugs = n(), .groups = "drop") %>%
-  left_join(population_by_region, by = "region") %>%
-  mutate(drug_rate_per_10k = (total_drugs / total_population) * 10000)
-
-speed_vs_drug <- broadband_by_region_summary %>%
-  left_join(drug_rate_by_region, by = "region")
-
-p12 <- ggplot(speed_vs_drug, aes(x = avg_download_speed, y = drug_rate_per_10k, color = region)) +
-  geom_point(size = 8, alpha = 0.8) +
-  geom_text(aes(label = region), vjust = -1.5, size = 4) +
-  labs(
-    title = "Average Download Speed vs Drug Offense Rate (2023)",
-    subtitle = "Regional Comparison",
-    x = "Average Download Speed (Mbit/s)",
-    y = "Drug Offenses per 10,000 People",
-    color = "Region"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold"), legend.position = "none") +
-  scale_color_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c")) +
-  expand_limits(y = c(0, max(speed_vs_drug$drug_rate_per_10k) * 1.5))
-
-ggsave(file.path(base_path, "Graphs/linear_model_speed_vs_drug.png"), 
-       plot = p12, width = 10, height = 7, dpi = 120)
-cat("Saved: linear_model_speed_vs_drug.png\n")
-
-# =============================================================================
-# SECTION 6: RECOMMENDATION SYSTEM
-# =============================================================================
-
-# --- House Price Score (lower is better) ---
-house_price_scores <- all_house_prices %>%
-  filter(year == 2023) %>%
-  group_by(town, region) %>%
-  summarise(avg_price = mean(price, na.rm = TRUE), num_sales = n(), .groups = "drop") %>%
-  filter(num_sales >= 5) %>%
-  mutate(price_score = 10 * (1 - (avg_price - min(avg_price)) / (max(avg_price) - min(avg_price))))
-
-# --- Broadband Score (higher is better) ---
-town_postcodes <- all_house_prices %>% distinct(town, postcode)
-
-broadband_by_town <- broadband_by_district %>%
-  left_join(town_postcodes %>% mutate(postcode_district = str_extract(postcode, "^[A-Z]+[0-9]+")) %>% 
-              distinct(postcode_district, town), by = "postcode_district") %>%
-  filter(!is.na(town)) %>%
-  group_by(town) %>%
-  summarise(avg_broadband = mean(avg_download, na.rm = TRUE), .groups = "drop") %>%
-  mutate(broadband_score = 10 * (avg_broadband - min(avg_broadband)) / (max(avg_broadband) - min(avg_broadband)))
-
-# --- Crime Score (lower is better) ---
-crime_by_town <- crime_data %>%
-  filter(year == 2023) %>%
-  mutate(town_extracted = str_extract(`LSOA name`, "^[^\\s]+")) %>%
-  group_by(region, town_extracted) %>%
-  summarise(total_crime = n(), .groups = "drop") %>%
-  rename(town = town_extracted)
-
-crime_scores <- crime_by_town %>%
-  mutate(crime_score = 10 * (1 - (total_crime - min(total_crime)) / (max(total_crime) - min(total_crime))))
-
-# --- Combine Scores ---
-overall_scores <- house_price_scores %>%
-  select(town, region, price_score, avg_price) %>%
-  left_join(broadband_by_town %>% select(town, broadband_score, avg_broadband), by = "town") %>%
-  left_join(crime_scores %>% select(town, crime_score, total_crime), by = "town") %>%
-  group_by(region) %>%
-  mutate(
-    broadband_score = ifelse(is.na(broadband_score), mean(broadband_score, na.rm = TRUE), broadband_score),
-    crime_score = ifelse(is.na(crime_score), mean(crime_score, na.rm = TRUE), crime_score)
-  ) %>%
-  ungroup() %>%
-  mutate(
-    broadband_score = ifelse(is.na(broadband_score), 5, broadband_score),
-    crime_score = ifelse(is.na(crime_score), 5, crime_score),
-    overall_score = 0.4 * price_score + 0.3 * broadband_score + 0.3 * crime_score
-  ) %>%
-  arrange(desc(overall_score))
-
-top_10_towns <- overall_scores %>% head(10)
-
-print("=== TOP 10 RECOMMENDED TOWNS ===")
-print(top_10_towns %>% select(town, region, price_score, broadband_score, crime_score, overall_score))
-
-# --- Visualization: Top 10 Towns ---
-p13 <- ggplot(top_10_towns, aes(x = reorder(town, overall_score), y = overall_score, fill = region)) +
-  geom_bar(stat = "identity", width = 0.7) +
-  geom_text(aes(label = round(overall_score, 2)), hjust = -0.2, size = 4) +
-  coord_flip() +
-  labs(
-    title = "Top 10 Recommended Towns for Property Investment",
-    subtitle = "Based on House Prices (40%), Broadband (30%), Crime Rate (30%)",
-    x = "Town",
-    y = "Overall Score (0-10)",
-    fill = "Region"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  scale_fill_manual(values = c("Cheshire" = "#3498db", "Cumberland" = "#e74c3c")) +
-  ylim(0, 12)
-
-ggsave(file.path(base_path, "Graphs/recommendation_top10_towns.png"), 
-       plot = p13, width = 12, height = 6, dpi = 120)
-cat("Saved: recommendation_top10_towns.png\n")
-
-# --- Score Breakdown ---
-top_10_long <- top_10_towns %>%
-  pivot_longer(cols = c(price_score, broadband_score, crime_score), 
-               names_to = "score_type", values_to = "score")
-
-p14 <- ggplot(top_10_long, aes(x = reorder(town, overall_score), y = score, fill = score_type)) +
-  geom_bar(stat = "identity", position = "stack") +
-  coord_flip() +
-  labs(
-    title = "Score Breakdown for Top 10 Towns",
-    subtitle = "Individual Scores: House Price, Broadband, Crime",
-    x = "Town",
-    y = "Score",
-    fill = "Score Type"
-  ) +
-  theme_minimal() +
-  theme(plot.title = element_text(size = 16, face = "bold")) +
-  scale_fill_manual(
-    values = c("price_score" = "#27ae60", "broadband_score" = "#3498db", "crime_score" = "#9b59b6"),
-    labels = c("Broadband Speed", "Crime Rate", "House Price")
-  )
-
-ggsave(file.path(base_path, "Graphs /recommendation_score_breakdown.png"), 
-       plot = p14, width = 14, height = 8, dpi = 120)
-cat("Saved: recommendation_score_breakdown.png\n")
-
-# =============================================================================
-# SECTION 7: SAVE DATA
-# =============================================================================
-
-write_csv(overall_scores, file.path(base_path, "Cleaned data/recommendation_scores.csv"))
-write_csv(top_10_towns, file.path(base_path, "Cleaned data/top_10_recommended_towns.csv"))
-
-# Print summary
-cat("\n=== SUMMARY STATISTICS ===\n")
-cat("\nHouse Prices (2023):\n")
-print(all_house_prices %>% filter(year == 2023) %>% group_by(region) %>% 
-        summarise(avg = mean(price), median = median(price), n = n()))
-
-cat("\nBroadband Speeds:\n")
-print(broadband_by_region %>% group_by(region) %>% 
-        summarise(avg_download = mean(mean_avg_download), max_download = max(mean_max_download)))
-
-cat("\nCrime Count (2023):\n")
-print(crime_2023 %>% group_by(region) %>% summarise(total = n()))
-
-cat("\n=== ANALYSIS COMPLETE ===\n")
-cat("All visualizations saved to:", file.path(base_path, "Graphs"), "\n")
+ggsave(file.path(base_path, "Graphs/Figure_12_linegraph_drug_offenses_per_10k.png"), 
+       plot = p12, width = 12, height = 6, dpi = 120)
+cat("Saved: Figure_12_linegraph_drug_offenses_per_10k.png\n")
